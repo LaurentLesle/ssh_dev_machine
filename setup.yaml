@@ -1,0 +1,315 @@
+- name: Setup Azure devops virtual machine
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars:
+    - resource_group_name: rg-caf-devops-maintainer
+    - location: southeastasia
+    - vnet_name: vnet-caf-devops
+    - address_prefixes: "192.168.111.0/24"
+    - vm_name: caf-devops-01
+    - admin_username: king.admin
+    - vm_size: Standard_F8s_v2
+    - key_path: "~/.ssh/{{vm_name}}"
+    - KNOWN_HOSTS_PATH: ~/.ssh/known_hosts
+    - SSH_CONFIG_PATH: ~/.ssh/config
+
+  tasks:
+
+    - debug:
+        msg: "{{ansible_facts}}"
+
+#     - name: Windows Setup
+#        get_url:
+#               url: #url of the file to download 
+#               dest: #path where you want to store it eg. /etc/downloaded-file
+#               mode: '0600' #permissions to be given to the file
+#        when: ansible_facts['distribution'] == "OracleLinux"
+
+#     - name: Check if SSH key is already present
+#       stat:
+#         path: "{{ key_path }}"
+#       register: key_stat_result
+
+#     - name: Generate SSH key for accessing GitHub
+#       command: "ssh-keygen -t rsa -f {{ key_path }} -N ''"
+#       when: not key_stat_result.stat.exists
+
+#     - name: Get key content
+#       command: "cat {{ key_path }}.pub"
+#       register: key_content
+
+#     - name: Set permission on key
+#       file: 
+#         path: "{{ key_path }}"
+#         mode: '0600'
+
+#     - name: Create resource group
+#       azure_rm_resourcegroup:
+#         name: "{{ resource_group_name }}"
+#         location: "{{ location }}"
+
+#     - name: Create virtual network
+#       azure_rm_virtualnetwork:
+#         resource_group: "{{ resource_group_name }}"
+#         name: "{{ vnet_name }}"
+#         address_prefixes: "192.168.111.0/24"
+
+#     - name: Add devops-vm subnet
+#       azure_rm_subnet:
+#         resource_group: "{{ resource_group_name }}"
+#         name: devops-vm
+#         address_prefix: "192.168.111.0/25"
+#         virtual_network: "{{ vnet_name }}"
+
+#     - name: Create Network Security Group
+#       azure_rm_securitygroup:
+#         resource_group: "{{ resource_group_name }}"
+#         name: nsg-remote-management
+#         rules:
+#           - name: 'ssh'
+#             protocol: Tcp
+#             destination_port_range: 22
+#             access: Allow
+#             priority: 501
+#             direction: Inbound
+
+
+#     - name: Create public IP address
+#       azure_rm_publicipaddress:
+#         resource_group: "{{ resource_group_name }}"
+#         allocation_method: Static
+#         domain_name: "{{ vm_name }}"
+#         name: "{{ vm_name }}-pip-01"
+
+#     - name: Create a network interface
+#       azure_rm_networkinterface:
+#         name: "{{ vm_name }}-nic-01"
+#         resource_group: "{{ resource_group_name }}"
+#         virtual_network: "{{ vnet_name }}"
+#         subnet_name: devops-vm
+#         security_group: nsg-remote-management
+#         ip_configurations:
+#           - name: default
+#             public_ip_address_name: "{{ vm_name }}-pip-01"
+#             primary: True
+
+#     - name: Create VM
+#       azure_rm_virtualmachine:
+#         resource_group: "{{ resource_group_name }}"
+#         name: "{{ vm_name }}"
+#         vm_size: "{{ vm_size }}"
+#         os_disk_size_gb: 128
+#         admin_username: "{{ admin_username }}"
+#         network_interfaces: "{{ vm_name }}-nic-01"
+#         os_type: Linux
+#         managed_disk_type: Premium_LRS
+#         vm_identity: SystemAssigned
+#         ssh_password_enabled: false
+#         ssh_public_keys: 
+#           - path: "/home/{{ admin_username }}/.ssh/authorized_keys"
+#             key_data: "{{key_content.stdout}}"
+#         image:
+#           offer: 0001-com-ubuntu-server-focal
+#           publisher: canonical
+#           sku: 20_04-lts-gen2
+#           version: latest
+
+#     - name: Get facts for one Public IP
+#       azure_rm_publicipaddress_info:
+#         resource_group: "{{ resource_group_name }}"
+#         name: "{{ vm_name }}-pip-01"
+#       register: publicipaddresses
+
+#     - name: register facts
+#       set_fact: 
+#         fqdn: "{{ publicipaddresses | json_query('publicipaddresses[0].dns_settings.fqdn')}}"
+#         admin_username: "{{ admin_username }}"
+#       register: shared
+
+#     - name: wait for the ssh port to come online
+#       wait_for:
+#         port: 22
+#         host: '{{ shared.ansible_facts.fqdn }}'
+#         timeout: 600
+
+#     - name: Check if known_host exists
+#       stat:
+#         path: "{{ KNOWN_HOSTS_PATH }}"
+#       register: known_hosts_stat
+
+#     - name: Create known_hosts if it doesn't exist
+#       file:
+#         path: "{{ KNOWN_HOSTS_PATH }}"
+#         state: touch
+#       when: not known_hosts_stat.stat.exists
+
+#     - name: Get the content of known hosts
+#       shell: "cat {{ KNOWN_HOSTS_PATH }} | grep {{ shared.ansible_facts.fqdn }}"
+#       register: host_stat
+#       failed_when: host_stat.rc > 1
+
+#     - name: Modify known hosts
+#       block:
+#       - name: Fetch GitHub public key
+#         command: ssh-keyscan -T 10 {{ shared.ansible_facts.fqdn }}
+#         register: keyscan
+
+#     - name: Add GitHub public key to ssh known_hosts
+#       lineinfile:
+#         path: "{{ KNOWN_HOSTS_PATH }}"
+#         create: yes
+#         line: "{{ item }}"
+#       with_items: '{{ keyscan.stdout_lines }}'
+#       when: host_stat.rc == 1
+
+#     - name: Check if ssh config exists
+#       stat:
+#         path: "{{ SSH_CONFIG_PATH }}"
+#       register: ssh_config_stat
+
+#     - name: Create ssh config if it doesn't exist
+#       file:
+#         path: "{{ SSH_CONFIG_PATH }}"
+#         state: touch
+#       when: not ssh_config_stat.stat.exists
+
+#     - name: Get the content of ssh config
+#       shell: "cat {{ SSH_CONFIG_PATH }} | grep 'Host {{ shared.ansible_facts.fqdn }}'"
+#       register: ssh_config_stat
+#       failed_when: ssh_config_stat.rc > 1
+
+#     - name: Add ssh config
+#       lineinfile:
+#         path: "{{ SSH_CONFIG_PATH }}"
+#         create: yes
+#         state: present
+#         line: "{{ item }}"
+#       with_items: 
+#         - "Host {{fqdn}}"
+#         - "    User {{ admin_username }}"
+#         - "    IdentityFile {{ key_path }}"
+#       when: ssh_config_stat.rc == 1
+ 
+
+#     - debug:
+#         msg: "{{shared}}"
+
+#     - name: Add a host with a non-standard port local to your machines
+#       add_host:
+#         name: '{{ shared.ansible_facts.fqdn }}'
+#         ansible_user: "{{ admin_username }}"
+#         groups: devops
+
+# - name: Setup the CAF development tools
+#   hosts: devops
+#   gather_facts: true
+#   become: true
+
+#   # vars:
+#   #   - ansible_host: "{{ shared.ansible_facts.fqdn }}"
+#   #   - ansible_user: "{{ shared.ansible_facts.admin_username }}"
+# #     - rover_image: "{{ caf_rover_image | default('aztfmod/rover:1.0.1-2107.2004') }}"
+# #     - git_starter_url: "{{ caf_git_starter_url | default('https://github.com/Azure/caf-terraform-landingzones-starter.git') }}"
+# #     - git_starter_branch_tag: "{{ caf_git_starter_branch_tag | default('AL-contoso') }}"
+# #     - git_landingzones_url: "{{ caf_git_landingzones_url | default('https://github.com/Azure/caf-terraform-landingzones.git') }}"
+# #     - git_landingzones_branch_tag: "{{ caf_git_landingzones_branch_tag | default('2107.1') }}"
+
+#   tasks:
+#     - name: Add Docker GPG key
+#       apt_key:
+#         url: https://download.docker.com/linux/ubuntu/gpg
+
+#     - name: Add Docker APT repository
+#       apt_repository:
+#         repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+#         state: present
+#         update_cache: yes
+
+#     - name: apt update
+#       apt:
+#         update_cache: yes
+
+#     - name: Install prerequisites for Docker repository
+#       apt:
+#         name: ['apt-transport-https', 'ca-certificates', 'curl', 'gnupg2', 'software-properties-common', 'git', 'jq']
+
+#     - name: install docker and it's dependencies
+#       apt:
+#         pkg:
+#           - docker-ce
+#           - docker-ce-cli
+#           - containerd.io
+#         state: present
+
+#     - name: Add the user '{{ ansible_user }}' to docker group
+#       user:
+#         name: "{{ ansible_user }}"
+#         shell: /bin/bash
+#         groups: docker
+#         append: yes
+        
+#     - name: start and enable docker daemon
+#       service:
+#         name: docker
+#         state: started
+#         enabled: yes
+
+#     - name: Install tools
+#       win_chocolatey:
+#         name:
+#           - git
+#           - python3
+#         state: present
+
+#     # Instal Docker desktop
+#     - name: Install docker desktop
+#       win_chocolatey:
+#         name: docker-desktop
+#         state: present
+
+#     - name: Copy scripts
+#       ansible.windows.win_copy:
+#         src: start-docker-desktop.ps1
+#         dest: d:\start-docker-desktop.ps1
+#       become: yes
+#       become_user: "{{ ansible_winrm_user }}"
+
+#     - name: Start Docker desktop
+#       win_shell: d:\start-docker-desktop.ps1
+#       become: yes
+#       become_user: "{{ ansible_winrm_user }}"
+
+#     - name: Pull the rover devcontainer base image
+#       ansible.windows.win_shell: docker pull {{ rover_image }}
+
+#     # Install vscode
+#     - name: Install vscode
+#       win_chocolatey:
+#         name: vscode
+#         state: present
+
+#     - name: Install vscode remote development extension
+#       win_command: powershell.exe -
+#       args:
+#         stdin: code --install-extension ms-vscode-remote.remote-containers
+
+#     # Cloning the repositories
+#     - name: Check starter destination folder.
+#       ansible.windows.win_stat:
+#         path: c:\users\{{ ansible_winrm_user }}\git\github.com\azure\caf-terraform-landingzones-starter
+#       register: git_destination
+
+#     - name: Clone starter kit
+#       win_shell: git clone -b {{ git_starter_branch_tag }} {{ git_starter_url }} C:\Users\{{ ansible_winrm_user }}\git\github.com\azure\caf-terraform-landingzones-starter
+#       when: git_destination.stat.exists == false
+
+#     - name: Check landingzones destination folder.
+#       ansible.windows.win_stat:
+#         path: c:\users\{{ ansible_winrm_user }}\git\github.com\azure\caf-terraform-landingzones-starter\landingzones
+#       register: git_landingzones_destination
+
+#     - name: Clone landing_zones
+#       win_shell: git clone -b {{ git_landingzones_branch_tag }} {{ git_landingzones_url }} C:\Users\{{ ansible_winrm_user }}\git\github.com\azure\caf-terraform-landingzones-starter\landingzones
+#       when: git_landingzones_destination.stat.exists == false

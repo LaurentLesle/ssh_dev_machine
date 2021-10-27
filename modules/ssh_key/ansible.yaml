@@ -1,0 +1,40 @@
+- debug:
+    msg: "copy_to_home_folder: {{copy_to_home_folder}}"
+
+- name: Check if SSH key is already present
+  stat:
+    path: "{{ item_path }}"
+  register: key_stat_result
+
+- name: Generate SSH key {{item_path}}
+  command: "ssh-keygen -t rsa -f {{ item_path }} -N ''"
+  when: not key_stat_result.stat.exists
+
+- name: Get key content {{item_path}}.pub
+  command: "cat {{ item_path }}.pub"
+  register: key_content
+
+- name: Set permission on key
+  file: 
+    path: "{{ item_path }}"
+    mode: '0600'
+  when: copy_to_home_folder == false
+
+- name: Create ~/.ssh
+  file:
+    path: ~/.ssh/
+    state: directory
+
+- name: Copy {{item_path}} to wsl home folder
+  copy:
+    src: "{{item_path}}"
+    dest: "~/.ssh/{{key_name}}"
+    force: true
+    mode: '0600'
+  when: copy_to_home_folder
+
+- name: Copy {{item_path}}.pub to wsl home folder
+  copy:
+    src: "{{item_path}}.pub"
+    dest: "~/.ssh/{{key_name}}.pub"
+  when: copy_to_home_folder

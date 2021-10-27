@@ -1,0 +1,61 @@
+- name: Set variable for known_host
+  set_fact:
+    known_hosts_path: "{{item_path}}/.ssh/known_hosts"
+    ssh_config_path: "{{item_path}}/.ssh/config"
+    key_path: "{{item_path}}/.ssh/{{vm_name}}"
+
+# - name: Check if known_host exists in {{ known_hosts_path }}
+#   stat:
+#     path: "{{ known_hosts_path }}"
+#   register: known_hosts_stat
+
+- name: Create known_hosts if it doesn't exist
+  file:
+    path: "{{ known_hosts_path }}"
+    state: touch
+  # when: not known_hosts_stat.stat.exists
+
+- name: Get the content of known hosts - {{ known_hosts_path }}
+  shell: "cat {{ known_hosts_path }} | grep {{ vm.ansible_facts.fqdn }}"
+  register: host_stat
+  failed_when: host_stat.rc > 1
+
+- debug:
+    msg: "{{host_stat}}"
+
+- name: Modify known hosts
+  block:
+  - name: Fetch GitHub public key
+    command: ssh-keyscan -T 10 {{ vm.ansible_facts.fqdn }}
+    register: keyscan
+
+- name: Add public key to {{ known_hosts_path }}
+  shell: "printf '%s\n' \"{{ item }}\" >> {{ known_hosts_path }}"
+  with_items: '{{ keyscan.stdout_lines }}'
+  when: host_stat.rc == 1
+
+- name: Check if ssh config exists
+  stat:
+    path: "{{ ssh_config_path }}"
+  register: ssh_config_stat
+
+- name: Create ssh config if it doesn't exist
+  file:
+    path: "{{ ssh_config_path }}"
+    state: touch
+  when: not ssh_config_stat.stat.exists
+
+- name: Get the content of ssh config
+  shell: "cat {{ ssh_config_path }} | grep 'Host {{ vm.ansible_facts.fqdn }}'"
+  register: ssh_config_stat
+  failed_when: ssh_config_stat.rc > 1
+
+  
+- name: Add ssh config
+  shell: "printf '%s\n' \"{{ item }}\" >> {{ ssh_config_path }}"
+  with_items: 
+    - ""
+    - "Host {{fqdn}}"
+    - "\tUser {{ admin_username }}"
+    - "\tIdentityFile ~/.ssh/{{vm_name}}"
+  when: ssh_config_stat.rc == 1
